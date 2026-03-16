@@ -1,0 +1,64 @@
+{
+  "name": "vehicle-fuel-tracking-system",
+  "productName": "Vehicle Fuel Tracking System",
+  "version": "1.0.0",
+  "description": "Desktop Vehicle Fuel Tracking System",
+  "main": "electron/main.js",
+  "author": "Rubin",
+  "license": "MIT",
+  "scripts": {
+    "frontend:start": "npm start --prefix frontend",
+    "frontend:build": "npm run build --prefix frontend",
+    "electron": "electron .",
+    "electron:start": "electron .",
+    "dev": "concurrently \"npm run frontend:start\" \"wait-on tcp:3000 && electron .\"",
+    "backend:build": ".\\venv\\Scripts\\python.exe -m PyInstaller fuel_backend.spec --noconfirm --clean --distpath dist --workpath build/backend",
+    "dist": "npm run frontend:build && npm run backend:build && electron-builder",
+    "dist:win": "npm run frontend:build && npm run backend:build && electron-builder --win"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^5.0.7"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^41.0.0",
+    "electron-builder": "^26.8.1",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "com.cdrmmo.vehiclefueltracking",
+    "productName": "Vehicle Fuel Tracking System",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "frontend/build/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/fuel_backend",
+        "to": "backend/fuel_backend"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "electron/favicon.ico",
+      "executableName": "Vehicle Fuel Tracking System",
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Vehicle Fuel Tracking System"
+    }
+  }
+}
