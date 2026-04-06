@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 from rest_framework import serializers
 from .models import Vehicle, FuelTransaction, BudgetAllocation, SystemSettings
 
@@ -19,7 +20,7 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = FuelTransaction
         fields = "__all__"
-        read_only_fields = ("amount", "created_at")
+        read_only_fields = ("created_at",)
         extra_kwargs = {
             "vehicle_name": {"required": False, "allow_blank": True},
             "vehicle_type": {"required": False},
@@ -54,17 +55,56 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
 
         return str(int(value))
 
+    def _validate_decimals(self, value, field_name, label, max_decimals):
+        if value in (None, ""):
+            return value
+
+        value_str = str(value).strip()
+
+        if "." in value_str:
+            decimal_part = value_str.split(".", 1)[1]
+            if len(decimal_part) > max_decimals:
+                raise serializers.ValidationError(
+                    {field_name: f"{label} must have at most {max_decimals} decimal places."}
+                )
+
+        return value
+
     def validate(self, attrs):
         vehicle = attrs.get("vehicle", getattr(self.instance, "vehicle", None))
         vehicle_name = attrs.get(
             "vehicle_name",
             getattr(self.instance, "vehicle_name", None),
         )
+        quantity = attrs.get("quantity", getattr(self.instance, "quantity", None))
+        unit_price = attrs.get("unit_price", getattr(self.instance, "unit_price", None))
+        amount = attrs.get("amount", getattr(self.instance, "amount", None))
 
         if not vehicle and not str(vehicle_name or "").strip():
             raise serializers.ValidationError(
                 {"vehicle_name": "Select a vehicle or enter a vehicle/equipment name."}
             )
+
+        self._validate_decimals(quantity, "quantity", "Quantity", 3)
+        self._validate_decimals(unit_price, "unit_price", "Unit price", 2)
+        self._validate_decimals(amount, "amount", "Amount", 2)
+
+        if quantity is None or Decimal(str(quantity)) <= 0:
+            raise serializers.ValidationError(
+                {"quantity": "Quantity must be greater than 0."}
+            )
+
+        if unit_price is None or Decimal(str(unit_price)) <= 0:
+            raise serializers.ValidationError(
+                {"unit_price": "Unit price must be greater than 0."}
+            )
+
+        if amount is None or Decimal(str(amount)) <= 0:
+            raise serializers.ValidationError(
+                {"amount": "Amount must be greater than 0."}
+            )
+
+        attrs["amount"] = Decimal(str(amount)).quantize(Decimal("0.01"))
 
         return attrs
 

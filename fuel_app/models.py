@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 
@@ -105,11 +105,7 @@ class FuelTransaction(models.Model):
 
     driver_name = models.CharField(max_length=150)
     destination = models.CharField(max_length=150, blank=True, null=True)
-
-    # changed from PositiveIntegerField to CharField
-    # so values like "130-143" are allowed
     odometer = models.CharField(max_length=50, blank=True, null=True)
-
     charge_invoice_no = models.CharField(max_length=100)
 
     product = models.CharField(
@@ -119,7 +115,7 @@ class FuelTransaction(models.Model):
     )
 
     quantity = models.DecimalField(max_digits=10, decimal_places=3)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
 
     fund_source = models.CharField(
         max_length=50,
@@ -147,12 +143,7 @@ class FuelTransaction(models.Model):
             if not self.section:
                 self.section = self.vehicle.section
 
-        quantity = self.quantity or Decimal("0.000")
-        unit_price = self.unit_price or Decimal("0.00")
-        self.amount = (quantity * unit_price).quantize(
-            Decimal("0.01"),
-            rounding=ROUND_HALF_UP,
-        )
+        self.amount = Decimal(str(self.amount)).quantize(Decimal("0.01"))
 
         super().save(*args, **kwargs)
 

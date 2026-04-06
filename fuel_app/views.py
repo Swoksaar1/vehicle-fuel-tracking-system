@@ -189,7 +189,7 @@ def dashboard_summary(request):
 
     total_quantity = (
         FuelTransaction.objects.aggregate(total=Sum("quantity"))["total"]
-        or Decimal("0.000")
+        or Decimal("0.00")
     )
 
     total_vehicles = Vehicle.objects.count()
