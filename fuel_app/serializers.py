@@ -1,7 +1,13 @@
 import re
 from decimal import Decimal
 from rest_framework import serializers
-from .models import Vehicle, FuelTransaction, BudgetAllocation, SystemSettings
+
+from .models import (
+    Vehicle,
+    FuelTransaction,
+    BudgetAllocation,
+    SystemSettings,
+)
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -28,6 +34,7 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
             "plate_no": {"required": False, "allow_blank": True, "allow_null": True},
             "destination": {"required": False, "allow_blank": True, "allow_null": True},
             "odometer": {"required": False, "allow_blank": True, "allow_null": True},
+            "fund_year": {"required": False},
         }
 
     def validate_odometer(self, value):
@@ -55,6 +62,24 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
 
         return str(int(value))
 
+    def validate_fund_year(self, value):
+        if value in (None, ""):
+            return 2026
+
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            raise serializers.ValidationError("Fund year must be a valid year.")
+
+        allowed_years = [2025, 2026, 2027, 2028, 2029, 2030]
+
+        if value not in allowed_years:
+            raise serializers.ValidationError(
+                "Fund year must be between 2025 and 2030."
+            )
+
+        return value
+
     def _validate_decimals(self, value, field_name, label, max_decimals):
         if value in (None, ""):
             return value
@@ -63,9 +88,12 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
 
         if "." in value_str:
             decimal_part = value_str.split(".", 1)[1]
+
             if len(decimal_part) > max_decimals:
                 raise serializers.ValidationError(
-                    {field_name: f"{label} must have at most {max_decimals} decimal places."}
+                    {
+                        field_name: f"{label} must have at most {max_decimals} decimal places."
+                    }
                 )
 
         return value
@@ -76,13 +104,17 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
             "vehicle_name",
             getattr(self.instance, "vehicle_name", None),
         )
+
         quantity = attrs.get("quantity", getattr(self.instance, "quantity", None))
         unit_price = attrs.get("unit_price", getattr(self.instance, "unit_price", None))
         amount = attrs.get("amount", getattr(self.instance, "amount", None))
+        fund_year = attrs.get("fund_year", getattr(self.instance, "fund_year", 2026))
 
         if not vehicle and not str(vehicle_name or "").strip():
             raise serializers.ValidationError(
-                {"vehicle_name": "Select a vehicle or enter a vehicle/equipment name."}
+                {
+                    "vehicle_name": "Select a vehicle or enter a vehicle/equipment name."
+                }
             )
 
         self._validate_decimals(quantity, "quantity", "Quantity", 3)
@@ -104,6 +136,21 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
                 {"amount": "Amount must be greater than 0."}
             )
 
+        try:
+            fund_year = int(fund_year)
+        except (TypeError, ValueError):
+            raise serializers.ValidationError(
+                {"fund_year": "Fund year must be a valid year."}
+            )
+
+        allowed_years = [2025, 2026, 2027, 2028, 2029, 2030]
+
+        if fund_year not in allowed_years:
+            raise serializers.ValidationError(
+                {"fund_year": "Fund year must be between 2025 and 2030."}
+            )
+
+        attrs["fund_year"] = fund_year
         attrs["amount"] = Decimal(str(amount)).quantize(Decimal("0.01"))
 
         return attrs
@@ -116,6 +163,8 @@ class FuelTransactionSerializer(serializers.ModelSerializer):
             validated_data.setdefault("plate_no", vehicle.plate_no)
             validated_data.setdefault("vehicle_type", vehicle.vehicle_type)
             validated_data.setdefault("section", vehicle.section)
+
+        validated_data.setdefault("fund_year", 2026)
 
         return super().create(validated_data)
 

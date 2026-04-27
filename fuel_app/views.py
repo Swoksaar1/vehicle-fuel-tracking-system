@@ -12,6 +12,7 @@ from .models import (
     SystemSettings,
     AdminAccount,
 )
+
 from .serializers import (
     VehicleSerializer,
     FuelTransactionSerializer,
@@ -30,17 +31,20 @@ def get_or_create_system_settings():
             "admin_email": "",
         },
     )
+
     return settings_obj
 
 
 def get_or_create_admin_account():
     account = AdminAccount.objects.order_by("id").first()
+
     if account:
         return account
 
     account = AdminAccount(username="fuel")
     account.set_password("fuel123")
     account.save()
+
     return account
 
 
@@ -50,7 +54,11 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
 
 class FuelTransactionViewSet(viewsets.ModelViewSet):
-    queryset = FuelTransaction.objects.select_related("vehicle").all().order_by("-date", "-id")
+    queryset = (
+        FuelTransaction.objects.select_related("vehicle")
+        .all()
+        .order_by("-date", "-id")
+    )
     serializer_class = FuelTransactionSerializer
 
 
@@ -94,6 +102,7 @@ def system_settings_view(request):
     if request.method == "GET":
         data = SystemSettingsSerializer(settings_obj).data
         data["login_username"] = account.username
+
         return Response(data)
 
     login_username = str(request.data.get("login_username", account.username)).strip()
@@ -131,6 +140,7 @@ def system_settings_view(request):
     response_data = serializer.data
     response_data["login_username"] = account.username
     response_data["message"] = "Settings saved successfully."
+
     return Response(response_data)
 
 
@@ -180,15 +190,34 @@ def change_password_view(request):
 
 @api_view(["GET"])
 def dashboard_summary(request):
-    total_transactions = FuelTransaction.objects.count()
+    year = request.GET.get("year")
+
+    budget_queryset = BudgetAllocation.objects.all()
+    fuel_queryset = FuelTransaction.objects.all()
+
+    selected_year = None
+
+    if year:
+        try:
+            selected_year = int(year)
+        except ValueError:
+            return Response(
+                {"detail": "Invalid year."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        budget_queryset = budget_queryset.filter(date_received__year=selected_year)
+        fuel_queryset = fuel_queryset.filter(fund_year=selected_year)
+
+    total_transactions = fuel_queryset.count()
 
     total_amount = (
-        FuelTransaction.objects.aggregate(total=Sum("amount"))["total"]
+        fuel_queryset.aggregate(total=Sum("amount"))["total"]
         or Decimal("0.00")
     )
 
     total_quantity = (
-        FuelTransaction.objects.aggregate(total=Sum("quantity"))["total"]
+        fuel_queryset.aggregate(total=Sum("quantity"))["total"]
         or Decimal("0.00")
     )
 
@@ -198,7 +227,7 @@ def dashboard_summary(request):
     non_serviceable_units = Vehicle.objects.filter(status="Non Serviceable").count()
 
     total_budget_allocated = (
-        BudgetAllocation.objects.aggregate(total=Sum("amount"))["total"]
+        budget_queryset.aggregate(total=Sum("amount"))["total"]
         or Decimal("0.00")
     )
 
@@ -206,15 +235,22 @@ def dashboard_summary(request):
     total_budget_remaining = total_budget_allocated - total_budget_used
 
     fund_breakdown = {}
+
     for fund_value, _ in FUND_SOURCE_CHOICES:
         allocated = (
-            BudgetAllocation.objects.filter(fund_type=fund_value).aggregate(total=Sum("amount"))["total"]
+            budget_queryset.filter(fund_type=fund_value).aggregate(total=Sum("amount"))[
+                "total"
+            ]
             or Decimal("0.00")
         )
+
         used = (
-            FuelTransaction.objects.filter(fund_source=fund_value).aggregate(total=Sum("amount"))["total"]
+            fuel_queryset.filter(fund_source=fund_value).aggregate(total=Sum("amount"))[
+                "total"
+            ]
             or Decimal("0.00")
         )
+
         remaining = allocated - used
 
         fund_breakdown[fund_value] = {
@@ -225,6 +261,7 @@ def dashboard_summary(request):
 
     return Response(
         {
+            "year": selected_year,
             "total_transactions": total_transactions,
             "total_amount": total_amount,
             "total_quantity": total_quantity,

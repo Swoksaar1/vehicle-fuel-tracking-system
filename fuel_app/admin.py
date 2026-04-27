@@ -69,13 +69,11 @@ class BudgetAllocationAdmin(admin.ModelAdmin):
     list_display = (
         "fund_type",
         "amount",
-        "reference_no",
         "date_received",
         "created_at",
     )
     search_fields = (
         "fund_type",
-        "reference_no",
         "remarks",
     )
     list_filter = (

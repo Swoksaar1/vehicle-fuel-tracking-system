@@ -17,6 +17,9 @@ SECTION_CHOICES = [
     ("EMS", "EMS"),
     ("SAR", "SAR"),
     ("TLD", "TLD"),
+    ("Admin", "Admin"),
+    ("CCC", "CCC"),
+    ("RPD", "RPD"),
     ("Others", "Others"),
 ]
 
@@ -37,6 +40,15 @@ FUND_SOURCE_CHOICES = [
     ("LDRRM Fund", "LDRRM Fund"),
     ("SB#1", "SB#1"),
     ("Quick Respond Fund", "Quick Respond Fund"),
+]
+
+FUND_YEAR_CHOICES = [
+    (2025, "2025"),
+    (2026, "2026"),
+    (2027, "2027"),
+    (2028, "2028"),
+    (2029, "2029"),
+    (2030, "2030"),
 ]
 
 
@@ -72,7 +84,6 @@ class BudgetAllocation(models.Model):
         default="CDRRMO Fund",
     )
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    reference_no = models.CharField(max_length=100, blank=True, null=True)
     remarks = models.TextField(blank=True, null=True)
     date_received = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -123,6 +134,11 @@ class FuelTransaction(models.Model):
         default="CDRRMO Fund",
     )
 
+    fund_year = models.PositiveIntegerField(
+        choices=FUND_YEAR_CHOICES,
+        default=2026,
+    )
+
     amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -148,7 +164,7 @@ class FuelTransaction(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.vehicle_name} - {self.product} - {self.date}"
+        return f"{self.vehicle_name} - {self.product} - {self.fund_year} - {self.date}"
 
 
 class SystemSettings(models.Model):
